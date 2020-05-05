@@ -23,6 +23,40 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #import <Cordova/CDV.h>
 
+// *****************************************************************************
+// CUSTOM: 2020-05-05
+// Custom preview controller.
+// *****************************************************************************
+
+@import QuickLook;
+
+@interface CustomPreviewController : QLPreviewController
+- (void)hideShareButton;
+@end
+
+@interface PreviewItem : NSObject <QLPreviewItem>
+  @property(readonly, nullable, nonatomic) NSURL    *previewItemURL;
+  @property(readonly, nullable, nonatomic) NSString *previewItemTitle;
+@end
+
+@interface PDFDataSource : NSObject <QLPreviewControllerDataSource>
+  @property (strong, nonatomic) PreviewItem *item;
+@end
+
+@interface FileOpener2 : CDVPlugin <UIDocumentInteractionControllerDelegate, QLPreviewControllerDelegate> {
+    NSString *localFile;
+    NSString* callbackId;
+}
+
+@property(nonatomic, strong) UIDocumentInteractionController *controller;
+@property(nonatomic, strong) CDVViewController *cdvViewController;
+@property(strong, nonatomic) PDFDataSource *pdfDatasource;
+
+- (void) open: (CDVInvokedUrlCommand*)command;
+
+@end
+
+/*
 @interface FileOpener2 : CDVPlugin <UIDocumentInteractionControllerDelegate> {
     NSString *localFile;
 }
@@ -33,3 +67,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - (void) open: (CDVInvokedUrlCommand*)command;
 
 @end
+*/

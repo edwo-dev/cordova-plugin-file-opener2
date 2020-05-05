@@ -26,6 +26,70 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #import <QuartzCore/QuartzCore.h>
 #import <MobileCoreServices/MobileCoreServices.h>
 
+// *****************************************************************************
+// CUSTOM: 2020-05-05
+// Custom preview controller, which hides "share" button.
+// *****************************************************************************
+
+@implementation CustomPreviewController
+
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+
+  [self hideShareButton];
+}
+
+- (void)hideShareButton {
+  for (UINavigationController *viewController in self.childViewControllers) {
+    if (viewController.view.subviews.count > 1) {
+      UINavigationBar *layoutContainerView = viewController.view.subviews[1];
+      if (layoutContainerView && layoutContainerView.subviews.count > 3) {
+        UIView* button = layoutContainerView.subviews[2].subviews[1];
+        [button setHidden:YES];
+      }
+    }
+  }
+}
+
+@end
+
+@implementation PreviewItem
+
+- (instancetype)initPreviewURL:(NSURL *)docURL
+                     WithTitle:(NSString *)title {
+  self = [super init];
+  if (self) {
+    _previewItemURL = [docURL copy];
+    _previewItemTitle = [title copy];
+  }
+  return self;
+}
+
+@end
+
+@implementation PDFDataSource
+
+- (instancetype)initWithPreviewItem:(PreviewItem *)item {
+  self = [super init];
+  if (self) {
+    _item = item;
+  }
+  return self;
+}
+
+- (NSInteger)numberOfPreviewItemsInPreviewController:(QLPreviewController *)controller {
+  return 1;
+}
+
+- (id<QLPreviewItem>)previewController:(QLPreviewController *)controller previewItemAtIndex:(NSInteger)index {
+  return self.item;
+}
+
+@end
+
+// *****************************************************************************
+
+
 @implementation FileOpener2
 @synthesize controller = docController;
 
@@ -93,7 +157,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		BOOL wasOpened = NO;
 
 		if (showPreview) {
-			wasOpened = [docController presentPreviewAnimated: NO];
+      
+      // ***********************************************************************
+      // CUSTOM: 2020-05-05
+      // Open PDF in custom preview.
+      // ***********************************************************************
+
+      callbackId = command.callbackId;
+      CustomPreviewController *qlController = [[CustomPreviewController alloc] init];
+      qlController.delegate = self;
+      PreviewItem *item = [[PreviewItem alloc] initPreviewURL:fileURL WithTitle:@""];
+      self.pdfDatasource = [[PDFDataSource alloc] initWithPreviewItem:item];
+      qlController.dataSource = self.pdfDatasource;
+      [self.viewController presentViewController:qlController animated:YES completion:^{}];
+      wasOpened = YES;
+      //wasOpened = [docController presentPreviewAnimated: NO];
+      
+      // ***********************************************************************
 		} else {
 			CDVViewController* cont = self.cdvViewController;
 			wasOpened = [docController presentOpenInMenuFromRect:rect inView:cont.view animated:YES];
@@ -101,7 +181,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		if(wasOpened) {
 			pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @""];
-			//NSLog(@"Success");
 		} else {
 			NSDictionary *jsonObj = [ [NSDictionary alloc]
 				initWithObjectsAndKeys :
@@ -111,7 +190,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			];
 			pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:jsonObj];
 		}
-		[self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    
+    // *************************************************************************
+    // CUSTOM: 2020-05-05
+    // Prevent prematurely callback.
+    // *************************************************************************
+    // [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    // *************************************************************************
 	});
 }
 
@@ -130,3 +215,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		return presentingViewController;
 	}
 @end
+
+// *****************************************************************************
+// CUSTOM: 2020-05-05
+// Send "finished" after document viewer was dismissed.
+// *****************************************************************************
+
+@implementation FileOpener2 (QLPreviewControllerDelegate)
+
+- (void)previewControllerDidDismiss:(QLPreviewController *)controller {
+  CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+}
+
+@end
+
+// *****************************************************************************
